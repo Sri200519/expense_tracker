@@ -7,10 +7,8 @@ const nextConfig = {
     unoptimized: true,
   },
   serverExternalPackages: ['tesseract.js'],
-  experimental: {
-    outputFileTracingIncludes: {
-      '/api/ocr': ['./node_modules/tesseract.js/**/*', './node_modules/tesseract.js-core/**/*'],
-    },
+  outputFileTracingIncludes: {
+    '/api/ocr': ['./node_modules/tesseract.js/**/*', './node_modules/tesseract.js-core/**/*'],
   },
 }
 
