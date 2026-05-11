@@ -605,7 +605,6 @@ export function ExpenseTracker() {
                     ref={fileInputRef}
                     type="file"
                     accept="image/*"
-                    capture="environment"
                     onChange={handleReceiptUpload}
                     className="hidden"
                   />
