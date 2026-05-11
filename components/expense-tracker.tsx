@@ -114,8 +114,8 @@ async function extractReceiptData(image: string | File | Blob): Promise<ScannedD
     }
 
     // Convert HEIC to JPEG if needed
-    if (imageBlob.type === 'image/heic' || imageBlob.type === 'image/heif' || 
-       (image instanceof File && (image.name.toLowerCase().endsWith('.heic') || image.name.toLowerCase().endsWith('.heif')))) {
+    if (imageBlob.type === 'image/heic' || imageBlob.type === 'image/heif' ||
+      (image instanceof File && (image.name.toLowerCase().endsWith('.heic') || image.name.toLowerCase().endsWith('.heif')))) {
       try {
         const heic2any = (await import('heic2any')).default;
         const converted = await heic2any({
@@ -165,7 +165,7 @@ export function ExpenseTracker() {
   const [activeTab, setActiveTab] = useState<"expenses" | "analytics">("expenses")
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(true)
-  
+
   useEffect(() => {
     const fetchExpenses = async () => {
       try {
@@ -337,12 +337,12 @@ export function ExpenseTracker() {
 
   const confirmDelete = async () => {
     if (!expenseToDelete) return
-    
+
     setIsDeleting(true)
     try {
       const res = await fetch(`/api/delete-expense?id=${expenseToDelete}`, { method: "DELETE" })
       const data = await res.json()
-      
+
       if (data.success) {
         setExpenses(prev => prev.filter(e => e.id !== expenseToDelete))
         toast({
@@ -581,10 +581,10 @@ export function ExpenseTracker() {
                 <div className="h-1.5 flex-1 bg-secondary rounded-full overflow-hidden">
                   <div
                     className="h-full bg-primary rounded-full transition-all duration-500"
-                    style={{ width: `${Math.min((monthlyTotal / 2000) * 100, 100)}%` }}
+                    style={{ width: `${Math.min((monthlyTotal / 1000) * 100, 100)}%` }}
                   />
                 </div>
-                <span className="text-xs text-muted-foreground">$2,000</span>
+                <span className="text-xs text-muted-foreground">$1,000</span>
               </div>
             </div>
 
@@ -780,32 +780,32 @@ export function ExpenseTracker() {
                     const Icon = catInfo.icon
 
                     return (
-                    <div
-                      key={expense.id}
-                      className="bg-card rounded-xl p-4 flex items-center gap-4 border border-border group"
-                    >
-                      <div className={cn("w-11 h-11 rounded-full flex items-center justify-center shrink-0", catInfo.color)}>
-                        <Icon className="w-5 h-5" />
+                      <div
+                        key={expense.id}
+                        className="bg-card rounded-xl p-4 flex items-center gap-4 border border-border group"
+                      >
+                        <div className={cn("w-11 h-11 rounded-full flex items-center justify-center shrink-0", catInfo.color)}>
+                          <Icon className="w-5 h-5" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-foreground truncate">{expense.merchant}</p>
+                          <p className="text-sm text-muted-foreground">{formatDate(expense.date)}</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <span className="font-semibold text-foreground">-${expense.amount.toFixed(2)}</span>
+                          <button
+                            onClick={() => handleDeleteExpense(expense.id)}
+                            className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/20 rounded-lg transition-all"
+                            aria-label="Delete expense"
+                          >
+                            <Trash2 className="w-4 h-4 text-destructive" />
+                          </button>
+                        </div>
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="font-medium text-foreground truncate">{expense.merchant}</p>
-                        <p className="text-sm text-muted-foreground">{formatDate(expense.date)}</p>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-semibold text-foreground">-${expense.amount.toFixed(2)}</span>
-                        <button
-                          onClick={() => handleDeleteExpense(expense.id)}
-                          className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/20 rounded-lg transition-all"
-                          aria-label="Delete expense"
-                        >
-                          <Trash2 className="w-4 h-4 text-destructive" />
-                        </button>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            )}
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </div>
         ) : (
