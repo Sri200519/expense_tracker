@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "sync:expenses": "node automation/sync-transactions.mjs",
+    "sync:replies": "node automation/process-telegram-replies.mjs",
+    "test:automation": "node --test automation/tests/*.test.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
