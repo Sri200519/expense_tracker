@@ -1,6 +1,6 @@
 import test from "node:test"
 import assert from "node:assert/strict"
-import { normalizeCategory, parseAmount, parseReviewReply, signedShare } from "../process-telegram-replies.mjs"
+import { normalizeCategory, parseAmount, parseReviewReply } from "../process-telegram-replies.mjs"
 
 test("parses common amount replies", () => {
   assert.equal(parseAmount("$12.50"), 12.5)
@@ -11,11 +11,6 @@ test("parses common amount replies", () => {
 test("rejects ambiguous reply text", () => {
   assert.equal(parseAmount("mine is 12.50"), null)
   assert.equal(parseAmount("12.345"), null)
-})
-
-test("inherits refund sign when a positive share is supplied", () => {
-  assert.equal(signedShare(5, -10), -5)
-  assert.equal(signedShare(5, 10), 5)
 })
 
 test("parses amount plus a Notion category", () => {

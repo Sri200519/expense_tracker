@@ -47,6 +47,7 @@ export async function ensureExpenseSchema() {
     }
   }
   if (!existing.Pending) additions.Pending = { checkbox: {} }
+  if (!existing.Excluded) additions.Excluded = { checkbox: {} }
   if (!existing["Category Needs Review"]) additions["Category Needs Review"] = { checkbox: {} }
   if (!existing["Review Status"]) {
     additions["Review Status"] = {
@@ -136,6 +137,14 @@ export function pageNumber(property) {
   return typeof property?.number === "number" ? property.number : null
 }
 
+export function pageCheckbox(property) {
+  return Boolean(property?.checkbox)
+}
+
+export function paymentMethodForItem(itemLabel) {
+  return itemLabel === "Venmo" ? "Venmo" : "Card"
+}
+
 export function plaidTransactionId(page) {
   return pageText(page.properties?.["Plaid Transaction ID"])
 }
@@ -150,6 +159,7 @@ export function transactionProperties({
   itemLabel,
   category,
   categoryNeedsReview = false,
+  excluded = false,
   preservePersonalAmount = false,
   includeNotes = true,
 }) {
@@ -171,16 +181,17 @@ export function transactionProperties({
     "Statement Amount": { number: transaction.amount },
     Category: { select: { name: category } },
     "Category Needs Review": { checkbox: Boolean(categoryNeedsReview) },
-    "Payment Method": { select: { name: itemLabel } },
+    "Payment Method": { select: { name: paymentMethodForItem(itemLabel) } },
     "Plaid Transaction ID": richText(transaction.transaction_id),
     "Plaid Account ID": richText(transaction.account_id),
     "Plaid Item": richText(itemLabel),
     Source: { select: { name: "Plaid" } },
     Pending: { checkbox: Boolean(transaction.pending) },
+    Excluded: { checkbox: Boolean(excluded) },
     "Auto-Detected": { checkbox: true },
   }
 
-  if (!preservePersonalAmount) properties["Total Amount"] = { number: transaction.amount }
+  if (!preservePersonalAmount) properties["Total Amount"] = { number: excluded ? 0 : null }
   if (includeNotes && notes) properties.Notes = richText(notes)
   return properties
 }
@@ -222,8 +233,21 @@ export async function applyPersonalReview(pageId, amount, category, existingNote
     "Total Amount": { number: amount },
     "Review Status": { select: { name: "Reviewed" } },
     "Category Needs Review": { checkbox: false },
+    Excluded: { checkbox: false },
     Notes: richText(notes),
   }
   if (category) properties.Category = { select: { name: category } }
   return updateExpense(pageId, properties)
+}
+
+export async function excludeExpense(pageId, existingNotes) {
+  const exclusionLine = "Excluded from expenses from Telegram: your share was 0."
+  const notes = existingNotes ? `${existingNotes}\n${exclusionLine}` : exclusionLine
+  return updateExpense(pageId, {
+    "Total Amount": { number: 0 },
+    "Review Status": { select: { name: "Reviewed" } },
+    "Category Needs Review": { checkbox: false },
+    Excluded: { checkbox: true },
+    Notes: richText(notes),
+  })
 }

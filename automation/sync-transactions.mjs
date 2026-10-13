@@ -7,6 +7,7 @@ import {
   listPlaidExpenses,
   markNotification,
   markNotificationMissing,
+  pageCheckbox,
   pageNumber,
   pageSelect,
   pageText,
@@ -46,16 +47,19 @@ function accountMap(accounts) {
 
 function differs(page, transaction, itemLabel) {
   const properties = page.properties || {}
+  const expectedPaymentMethod = itemLabel === "Venmo" ? "Venmo" : "Card"
   return (
     pageNumber(properties["Statement Amount"]) !== transaction.amount ||
     properties.Date?.date?.start !== transaction.date ||
     pageText(properties.Merchant) !== (transaction.merchant_name || transaction.name || "Unknown") ||
     Boolean(properties.Pending?.checkbox) !== Boolean(transaction.pending) ||
-    pageText(properties["Plaid Item"]) !== itemLabel
+    pageText(properties["Plaid Item"]) !== itemLabel ||
+    pageSelect(properties["Payment Method"]) !== expectedPaymentMethod
   )
 }
 
 async function notifyIfNeeded(page, transaction, itemLabel, category, categoryNeedsReview) {
+  if (pageCheckbox(page.properties?.Excluded)) return false
   const existingMessageId = pageNumber(page.properties?.["Telegram Message ID"])
   if (existingMessageId) return false
 
@@ -101,7 +105,15 @@ async function main() {
     return configuredStart > rollingStartDate ? configuredStart : rollingStartDate
   }
 
-  const summary = { created: 0, updated: 0, archivedPending: 0, notified: 0, unchanged: 0, skippedCardholder: 0 }
+  const summary = {
+    created: 0,
+    updated: 0,
+    archivedPending: 0,
+    carriedExclusions: 0,
+    notified: 0,
+    unchanged: 0,
+    skippedCardholder: 0,
+  }
 
   const itemResults = []
   for (const item of items) {
@@ -132,9 +144,11 @@ async function main() {
       if (!shouldIncludeTransaction(transaction, item.label)) continue
       if (item.label !== "Venmo" && isVenmoFundingDuplicate(transaction, venmoTransactions)) continue
 
+      let inheritedExclusion = false
       if (transaction.pending_transaction_id) {
         const pendingPage = pagesByTransactionId.get(transaction.pending_transaction_id)
         if (pendingPage && !pendingPage.archived) {
+          inheritedExclusion = pageCheckbox(pendingPage.properties?.Excluded)
           await archiveExpense(pendingPage.id)
           pendingPage.archived = true
           summary.archivedPending += 1
@@ -154,14 +168,25 @@ async function main() {
             itemLabel: item.label,
             category,
             categoryNeedsReview,
+            excluded: inheritedExclusion,
           }),
-          "Review Status": { select: { name: telegramConfig({ optional: true }) ? "Awaiting reply" : "Notification not sent" } },
+          "Review Status": {
+            select: {
+              name: inheritedExclusion
+                ? "Reviewed"
+                : telegramConfig({ optional: true })
+                  ? "Awaiting reply"
+                  : "Notification not sent",
+            },
+          },
         })
         pagesByTransactionId.set(transaction.transaction_id, page)
         summary.created += 1
+        if (inheritedExclusion) summary.carriedExclusions += 1
         await sleep(WRITE_DELAY_MS)
       } else if (differs(page, transaction, item.label)) {
         const reviewed = pageSelect(page.properties?.["Review Status"]) === "Reviewed"
+        const excluded = pageCheckbox(page.properties?.Excluded)
         page = await updateExpense(
           page.id,
           transactionProperties({
@@ -170,6 +195,7 @@ async function main() {
             itemLabel: item.label,
             category: pageSelect(page.properties?.Category) || category,
             categoryNeedsReview: Boolean(page.properties?.["Category Needs Review"]?.checkbox),
+            excluded,
             preservePersonalAmount: reviewed,
             includeNotes: false,
           }),

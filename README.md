@@ -13,12 +13,14 @@ The recurring jobs run in GitHub Actions. Your computer does not need to stay on
 - Excludes card payments and ordinary transfers to prevent double-counting.
 - Includes merchant refunds as negative amounts. For Venmo, it includes outgoing personal payments and refunds while excluding incoming payments and transfers.
 - Deduplicates a matching `VENMO` charge on Capital One or American Express when the same payment is present in the connected Venmo feed.
-- Keeps `Statement Amount` unchanged and uses `Total Amount` for your share.
+- Keeps the original bank amount internally for matching and `all`, but hides it from the default Notion view. `Total Amount` stays blank until your Telegram reply and then stores exactly what you replied.
+- Stores American Express and Capital One under the `Card` payment method while retaining the issuer in `Plaid Item`; Venmo remains `Venmo`.
 - Maps Plaid personal-finance categories into the app's existing categories.
-- Sends each new transaction to Telegram. Reply directly with `all` for the full statement amount, or use `12.50`, `$12.50`, or `0` for a specific personal share.
+- Sends each new transaction to Telegram. Reply directly with `all` for the full bank amount, use `12.50` or `$12.50` for the exact `Total Amount`, or reply `0` to hide the row permanently.
 - Shows the suggested Notion category. Correct it with a reply such as `12.50 | Groceries`.
 - Requires an amount-and-category reply when Plaid's category is missing or low-confidence; `all | Groceries` accepts the full amount and supplies the category.
 - Processes Telegram replies hourly in GitHub Actions and updates the matching Notion row.
+- Keeps a hidden `Excluded` marker for zero replies so a later daily sync cannot recreate the removed expense.
 
 ## One-time setup
 

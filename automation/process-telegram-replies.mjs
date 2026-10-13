@@ -1,6 +1,8 @@
 import {
   applyPersonalReview,
+  excludeExpense,
   listPlaidExpenses,
+  pageCheckbox,
   pageNumber,
   pageSelect,
   pageText,
@@ -23,11 +25,6 @@ export function parseAmount(text) {
   if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalized)) return null
   const amount = Number(normalized)
   return Number.isFinite(amount) ? amount : null
-}
-
-export function signedShare(replyAmount, statementAmount) {
-  if (statementAmount < 0 && replyAmount > 0) return -replyAmount
-  return replyAmount
 }
 
 export function normalizeCategory(value) {
@@ -76,7 +73,10 @@ async function main() {
 
     const repliedToId = message.reply_to_message?.message_id
     if (!repliedToId) {
-      await sendTelegramConfirmation("Reply directly to a transaction message with an amount, for example 12.50.", message.message_id)
+      await sendTelegramConfirmation(
+        "Reply directly to a transaction message with all, 0, or your exact amount, for example 12.50.",
+        message.message_id,
+      )
       continue
     }
 
@@ -103,21 +103,31 @@ async function main() {
       continue
     }
 
+    const statementAmount = pageNumber(page.properties?.["Statement Amount"]) ?? 0
+    const amount = parsed.useFullAmount ? statementAmount : parsed.amount
+
+    if (amount === 0) {
+      if (pageCheckbox(page.properties?.Excluded)) {
+        await sendTelegramConfirmation("This transaction is already excluded from your expense sheet.", message.message_id)
+        continue
+      }
+      const notes = pageText(page.properties?.Notes)
+      const merchant = pageText(page.properties?.Merchant) || "transaction"
+      await excludeExpense(page.id, notes)
+      await sleep(WRITE_DELAY_MS)
+      await sendTelegramConfirmation(
+        `Removed ${merchant} from your visible expense sheet. It will not be re-imported.`,
+        message.message_id,
+      )
+      processed += 1
+      continue
+    }
+
     const categoryNeedsReview = Boolean(page.properties?.["Category Needs Review"]?.checkbox)
     if (categoryNeedsReview && !parsed.category) {
       const amountExample = parsed.useFullAmount ? "all" : Math.abs(parsed.amount).toFixed(2)
       await sendTelegramConfirmation(
         `I need the category too. Reply to the original transaction with: ${amountExample} | category\nCategories: ${categoryNames().join(", ")}`,
-        message.message_id,
-      )
-      continue
-    }
-
-    const statementAmount = pageNumber(page.properties?.["Statement Amount"]) ?? 0
-    const amount = parsed.useFullAmount ? statementAmount : signedShare(parsed.amount, statementAmount)
-    if (Math.abs(amount) > Math.abs(statementAmount)) {
-      await sendTelegramConfirmation(
-        `Your amount cannot exceed the statement amount of $${Math.abs(statementAmount).toFixed(2)}.`,
         message.message_id,
       )
       continue
