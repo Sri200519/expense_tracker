@@ -75,7 +75,7 @@ Plaid does not always populate `account_owner` for credit-card transactions. Whe
 
 Open **Actions → Daily expense sync → Run workflow**. Capital One and Venmo import on or after October 12, 2026; Amex imports on or after October 5, 2026 and applies the configured cardholder filter. New expenses produce Telegram review prompts. After you reply, **Process transaction review replies** applies the amount on its next hourly run; it can also be run manually. For a category correction, use `amount | category`, such as `5 | Groceries`. Valid categories are Food, Shopping, School, Transport, Entertainment, Paraphernalia, Groceries, and Other.
 
-The daily schedule is 7:17 AM America/New_York. GitHub may delay scheduled jobs during periods of high load.
+The daily schedule is 8:00 PM America/New_York. GitHub may delay scheduled jobs during periods of high load.
 
 ## Local verification (optional)
 
