@@ -38,11 +38,14 @@ export function normalizeCategory(value) {
 export function parseReviewReply(text) {
   const parts = String(text || "").split("|")
   if (parts.length > 2) return null
-  const amount = parseAmount(parts[0])
-  if (amount === null) return null
+  const amountText = parts[0].trim()
+  const useFullAmount = amountText.toLowerCase() === "all"
+  const amount = useFullAmount ? null : parseAmount(amountText)
+  if (!useFullAmount && amount === null) return null
   const categoryProvided = parts.length === 2 && Boolean(parts[1].trim())
   return {
     amount,
+    useFullAmount,
     categoryProvided,
     category: categoryProvided ? normalizeCategory(parts[1]) : null,
   }
@@ -85,7 +88,10 @@ async function main() {
 
     const parsed = parseReviewReply(message.text)
     if (!parsed) {
-      await sendTelegramConfirmation("Reply with an amount, such as 12.50, or amount | category.", message.message_id)
+      await sendTelegramConfirmation(
+        "Reply with all for the full amount, a number such as 12.50, or amount | category.",
+        message.message_id,
+      )
       continue
     }
 
@@ -99,15 +105,16 @@ async function main() {
 
     const categoryNeedsReview = Boolean(page.properties?.["Category Needs Review"]?.checkbox)
     if (categoryNeedsReview && !parsed.category) {
+      const amountExample = parsed.useFullAmount ? "all" : Math.abs(parsed.amount).toFixed(2)
       await sendTelegramConfirmation(
-        `I need the category too. Reply to the original transaction with: ${Math.abs(parsed.amount).toFixed(2)} | category\nCategories: ${categoryNames().join(", ")}`,
+        `I need the category too. Reply to the original transaction with: ${amountExample} | category\nCategories: ${categoryNames().join(", ")}`,
         message.message_id,
       )
       continue
     }
 
     const statementAmount = pageNumber(page.properties?.["Statement Amount"]) ?? 0
-    const amount = signedShare(parsed.amount, statementAmount)
+    const amount = parsed.useFullAmount ? statementAmount : signedShare(parsed.amount, statementAmount)
     if (Math.abs(amount) > Math.abs(statementAmount)) {
       await sendTelegramConfirmation(
         `Your amount cannot exceed the statement amount of $${Math.abs(statementAmount).toFixed(2)}.`,

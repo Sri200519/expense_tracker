@@ -15,9 +15,9 @@ The recurring jobs run in GitHub Actions. Your computer does not need to stay on
 - Deduplicates a matching `VENMO` charge on Capital One or American Express when the same payment is present in the connected Venmo feed.
 - Keeps `Statement Amount` unchanged and uses `Total Amount` for your share.
 - Maps Plaid personal-finance categories into the app's existing categories.
-- Sends each new transaction to Telegram. Reply directly with `12.50`, `$12.50`, or `0`.
+- Sends each new transaction to Telegram. Reply directly with `all` for the full statement amount, or use `12.50`, `$12.50`, or `0` for a specific personal share.
 - Shows the suggested Notion category. Correct it with a reply such as `12.50 | Groceries`.
-- Requires an amount-and-category reply when Plaid's category is missing or low-confidence.
+- Requires an amount-and-category reply when Plaid's category is missing or low-confidence; `all | Groceries` accepts the full amount and supplies the category.
 - Processes Telegram replies hourly in GitHub Actions and updates the matching Notion row.
 
 ## One-time setup

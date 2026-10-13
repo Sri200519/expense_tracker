@@ -40,10 +40,10 @@ export async function sendTransactionReview({
     "",
     categoryNeedsReview
       ? "I am not confident about the category. Reply with: amount | category"
-      : "Reply with your exact amount. To correct the category, use: amount | category",
+      : "Reply all if the full amount is yours, or reply with your exact amount. To correct the category, use: amount | category",
     categoryNeedsReview
-      ? `Example: 12.50 | Groceries\nCategories: ${categoryNames().join(", ")}`
-      : "Examples: 12.50, $12.50, 0, or 12.50 | Food",
+      ? `Examples: all | Groceries or 12.50 | Groceries\nCategories: ${categoryNames().join(", ")}`
+      : "Examples: all, 12.50, $12.50, 0, or all | Food",
   ].join("\n")
 
   return telegramRequest("sendMessage", { chat_id: config.chatId, text })
