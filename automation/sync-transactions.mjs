@@ -1,4 +1,4 @@
-import { categorizeTransaction } from "./lib/categories.mjs"
+import { categorizeTransactionDecision } from "./lib/categories.mjs"
 import { configuredPlaidItems, telegramConfig } from "./lib/config.mjs"
 import {
   archiveExpense,
@@ -54,7 +54,7 @@ function differs(page, transaction, itemLabel) {
   )
 }
 
-async function notifyIfNeeded(page, transaction, itemLabel) {
+async function notifyIfNeeded(page, transaction, itemLabel, category, categoryNeedsReview) {
   const existingMessageId = pageNumber(page.properties?.["Telegram Message ID"])
   if (existingMessageId) return false
 
@@ -71,6 +71,10 @@ async function notifyIfNeeded(page, transaction, itemLabel) {
     amount: transaction.amount,
     itemLabel,
     date: transaction.date,
+    category,
+    categoryNeedsReview,
+    pending: Boolean(transaction.pending),
+    postedFromPending: Boolean(transaction.pending_transaction_id),
   })
   await markNotification(page.id, message.message_id)
   await sleep(WRITE_DELAY_MS)
@@ -127,7 +131,8 @@ async function main() {
         }
       }
 
-      const category = categorizeTransaction(transaction)
+      const categoryDecision = categorizeTransactionDecision(transaction)
+      const { category, needsReview: categoryNeedsReview } = categoryDecision
       let page = pagesByTransactionId.get(transaction.transaction_id)
 
       if (!page) {
@@ -137,6 +142,7 @@ async function main() {
             account: accountsById.get(transaction.account_id),
             itemLabel: item.label,
             category,
+            categoryNeedsReview,
           }),
           "Review Status": { select: { name: telegramConfig({ optional: true }) ? "Awaiting reply" : "Notification not sent" } },
         })
@@ -152,6 +158,7 @@ async function main() {
             account: accountsById.get(transaction.account_id),
             itemLabel: item.label,
             category: pageSelect(page.properties?.Category) || category,
+            categoryNeedsReview: Boolean(page.properties?.["Category Needs Review"]?.checkbox),
             preservePersonalAmount: reviewed,
             includeNotes: false,
           }),
@@ -164,7 +171,7 @@ async function main() {
       }
 
       try {
-        if (await notifyIfNeeded(page, transaction, item.label)) summary.notified += 1
+        if (await notifyIfNeeded(page, transaction, item.label, category, categoryNeedsReview)) summary.notified += 1
       } catch (error) {
         console.warn(`Notification failed for ${transaction.transaction_id}: ${error.message}`)
       }

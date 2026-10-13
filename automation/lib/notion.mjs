@@ -47,6 +47,7 @@ export async function ensureExpenseSchema() {
     }
   }
   if (!existing.Pending) additions.Pending = { checkbox: {} }
+  if (!existing["Category Needs Review"]) additions["Category Needs Review"] = { checkbox: {} }
   if (!existing["Review Status"]) {
     additions["Review Status"] = {
       select: {
@@ -148,6 +149,7 @@ export function transactionProperties({
   account,
   itemLabel,
   category,
+  categoryNeedsReview = false,
   preservePersonalAmount = false,
   includeNotes = true,
 }) {
@@ -168,6 +170,7 @@ export function transactionProperties({
     Merchant: title(merchant),
     "Statement Amount": { number: transaction.amount },
     Category: { select: { name: category } },
+    "Category Needs Review": { checkbox: Boolean(categoryNeedsReview) },
     "Payment Method": { select: { name: itemLabel } },
     "Plaid Transaction ID": richText(transaction.transaction_id),
     "Plaid Account ID": richText(transaction.account_id),
@@ -211,12 +214,16 @@ export async function markNotificationMissing(pageId) {
   })
 }
 
-export async function applyPersonalAmount(pageId, amount, existingNotes) {
-  const reviewLine = `Your share confirmed from Telegram: $${amount.toFixed(2)}`
+export async function applyPersonalReview(pageId, amount, category, existingNotes) {
+  const categoryLine = category ? ` | Category confirmed: ${category}` : ""
+  const reviewLine = `Your share confirmed from Telegram: $${amount.toFixed(2)}${categoryLine}`
   const notes = existingNotes ? `${existingNotes}\n${reviewLine}` : reviewLine
-  return updateExpense(pageId, {
+  const properties = {
     "Total Amount": { number: amount },
     "Review Status": { select: { name: "Reviewed" } },
+    "Category Needs Review": { checkbox: false },
     Notes: richText(notes),
-  })
+  }
+  if (category) properties.Category = { select: { name: category } }
+  return updateExpense(pageId, properties)
 }

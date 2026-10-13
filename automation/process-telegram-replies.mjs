@@ -1,5 +1,13 @@
-import { pageNumber, pageText, listPlaidExpenses, telegramMessageId, applyPersonalAmount } from "./lib/notion.mjs"
+import {
+  applyPersonalReview,
+  listPlaidExpenses,
+  pageNumber,
+  pageSelect,
+  pageText,
+  telegramMessageId,
+} from "./lib/notion.mjs"
 import { pathToFileURL } from "node:url"
+import { categoryNames } from "./lib/categories.mjs"
 import {
   acknowledgeTelegramUpdates,
   configuredTelegramChatId,
@@ -20,6 +28,24 @@ export function parseAmount(text) {
 export function signedShare(replyAmount, statementAmount) {
   if (statementAmount < 0 && replyAmount > 0) return -replyAmount
   return replyAmount
+}
+
+export function normalizeCategory(value) {
+  const wanted = String(value || "").trim().toLowerCase()
+  return categoryNames().find((category) => category.toLowerCase() === wanted) || null
+}
+
+export function parseReviewReply(text) {
+  const parts = String(text || "").split("|")
+  if (parts.length > 2) return null
+  const amount = parseAmount(parts[0])
+  if (amount === null) return null
+  const categoryProvided = parts.length === 2 && Boolean(parts[1].trim())
+  return {
+    amount,
+    categoryProvided,
+    category: categoryProvided ? normalizeCategory(parts[1]) : null,
+  }
 }
 
 async function main() {
@@ -57,14 +83,31 @@ async function main() {
       continue
     }
 
-    const parsed = parseAmount(message.text)
-    if (parsed === null) {
-      await sendTelegramConfirmation("Send only an amount, such as 12.50 or 0.", message.message_id)
+    const parsed = parseReviewReply(message.text)
+    if (!parsed) {
+      await sendTelegramConfirmation("Reply with an amount, such as 12.50, or amount | category.", message.message_id)
+      continue
+    }
+
+    if (parsed.categoryProvided && !parsed.category) {
+      await sendTelegramConfirmation(
+        `Unknown category. Use one of: ${categoryNames().join(", ")}. Example: 12.50 | Groceries`,
+        message.message_id,
+      )
+      continue
+    }
+
+    const categoryNeedsReview = Boolean(page.properties?.["Category Needs Review"]?.checkbox)
+    if (categoryNeedsReview && !parsed.category) {
+      await sendTelegramConfirmation(
+        `I need the category too. Reply to the original transaction with: ${Math.abs(parsed.amount).toFixed(2)} | category\nCategories: ${categoryNames().join(", ")}`,
+        message.message_id,
+      )
       continue
     }
 
     const statementAmount = pageNumber(page.properties?.["Statement Amount"]) ?? 0
-    const amount = signedShare(parsed, statementAmount)
+    const amount = signedShare(parsed.amount, statementAmount)
     if (Math.abs(amount) > Math.abs(statementAmount)) {
       await sendTelegramConfirmation(
         `Your amount cannot exceed the statement amount of $${Math.abs(statementAmount).toFixed(2)}.`,
@@ -74,8 +117,9 @@ async function main() {
     }
 
     if (
-      page.properties?.["Review Status"]?.select?.name === "Reviewed" &&
-      pageNumber(page.properties?.["Total Amount"]) === amount
+      pageSelect(page.properties?.["Review Status"]) === "Reviewed" &&
+      pageNumber(page.properties?.["Total Amount"]) === amount &&
+      (!parsed.category || pageSelect(page.properties?.Category) === parsed.category)
     ) {
       await sendTelegramConfirmation(
         `Your $${Math.abs(amount).toFixed(2)} share for this transaction was already saved.`,
@@ -85,12 +129,12 @@ async function main() {
     }
 
     const notes = pageText(page.properties?.Notes)
-    await applyPersonalAmount(page.id, amount, notes)
+    await applyPersonalReview(page.id, amount, parsed.category, notes)
     await sleep(WRITE_DELAY_MS)
 
     const merchant = pageText(page.properties?.Merchant) || "transaction"
     await sendTelegramConfirmation(
-      `Saved $${Math.abs(amount).toFixed(2)} as your share for ${merchant}.`,
+      `Saved $${Math.abs(amount).toFixed(2)} as your share for ${merchant}${parsed.category ? ` in ${parsed.category}` : ""}.`,
       message.message_id,
     )
     processed += 1

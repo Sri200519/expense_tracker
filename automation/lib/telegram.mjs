@@ -1,4 +1,5 @@
 import { telegramConfig } from "./config.mjs"
+import { categoryNames } from "./categories.mjs"
 
 async function telegramRequest(method, body, { optional = false } = {}) {
   const config = telegramConfig({ optional })
@@ -16,18 +17,33 @@ async function telegramRequest(method, body, { optional = false } = {}) {
   return data.result
 }
 
-export async function sendTransactionReview({ merchant, amount, itemLabel, date }) {
+export async function sendTransactionReview({
+  merchant,
+  amount,
+  itemLabel,
+  date,
+  category,
+  categoryNeedsReview,
+  pending,
+  postedFromPending,
+}) {
   const config = telegramConfig({ optional: true })
   if (!config) return null
 
   const sign = amount < 0 ? "-$" : "$"
   const displayedAmount = `${sign}${Math.abs(amount).toFixed(2)}`
+  const heading = pending ? "Pending transaction" : postedFromPending ? "Expense posted" : "New posted transaction"
   const text = [
-    `New transaction: ${merchant}`,
+    `${heading}: ${merchant}`,
     `${itemLabel} • ${date} • ${displayedAmount}`,
+    `Category: ${category}${categoryNeedsReview ? " (please confirm)" : ""}`,
     "",
-    "Reply to this message with the exact amount that is yours.",
-    "Examples: 12.50, $12.50, or 0 if none is yours.",
+    categoryNeedsReview
+      ? "I am not confident about the category. Reply with: amount | category"
+      : "Reply with your exact amount. To correct the category, use: amount | category",
+    categoryNeedsReview
+      ? `Example: 12.50 | Groceries\nCategories: ${categoryNames().join(", ")}`
+      : "Examples: 12.50, $12.50, 0, or 12.50 | Food",
   ].join("\n")
 
   return telegramRequest("sendMessage", { chat_id: config.chatId, text })

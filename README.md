@@ -8,13 +8,15 @@ The recurring jobs run in GitHub Actions. Your computer does not need to stay on
 
 - Pulls a rolling 45-day window once per day, but never imports anything before the configured `PLAID_IMPORT_START_DATE`.
 - Uses Plaid's stable transaction ID to upsert rows, so reruns do not create duplicates.
-- Replaces matched pending transactions with their posted versions.
+- Replaces matched pending transactions with their posted versions and sends an **Expense posted** Telegram notice.
 - Excludes card payments and ordinary transfers to prevent double-counting.
 - Includes merchant refunds as negative amounts. For Venmo, it includes outgoing personal payments and refunds while excluding incoming payments and transfers.
 - Deduplicates a matching `VENMO` charge on Capital One or American Express when the same payment is present in the connected Venmo feed.
 - Keeps `Statement Amount` unchanged and uses `Total Amount` for your share.
 - Maps Plaid personal-finance categories into the app's existing categories.
-- Sends each new transaction to Telegram. Reply directly to the message with `12.50`, `$12.50`, or `0`.
+- Sends each new transaction to Telegram. Reply directly with `12.50`, `$12.50`, or `0`.
+- Shows the suggested Notion category. Correct it with a reply such as `12.50 | Groceries`.
+- Requires an amount-and-category reply when Plaid's category is missing or low-confidence.
 - Processes Telegram replies hourly in GitHub Actions and updates the matching Notion row.
 
 ## One-time setup
@@ -65,7 +67,7 @@ The checked-in workflow sets `PLAID_IMPORT_START_DATE` to `2026-10-12`, so the f
 
 ### 5. Run once and verify
 
-Open **Actions → Daily expense sync → Run workflow**. The first run imports only transactions on or after October 12, 2026 and sends Telegram review prompts. After you reply, **Process transaction review replies** applies the amount on its next hourly run; it can also be run manually.
+Open **Actions → Daily expense sync → Run workflow**. The first run imports only transactions on or after October 12, 2026 and sends Telegram review prompts. After you reply, **Process transaction review replies** applies the amount on its next hourly run; it can also be run manually. For a category correction, use `amount | category`, such as `5 | Groceries`. Valid categories are Food, Shopping, School, Transport, Entertainment, Paraphernalia, Groceries, and Other.
 
 The daily schedule is 7:17 AM America/New_York. GitHub may delay scheduled jobs during periods of high load.
 

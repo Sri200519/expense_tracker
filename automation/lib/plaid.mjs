@@ -40,6 +40,7 @@ export async function fetchTransactions(accessToken, startDate, endDate) {
       access_token: accessToken,
       start_date: startDate,
       end_date: endDate,
+      personal_finance_category_version: "v2",
       options: {
         count,
         offset,
