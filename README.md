@@ -7,6 +7,7 @@ The recurring jobs run in GitHub Actions. Your computer does not need to stay on
 ## What the automation does
 
 - Pulls a rolling 45-day window once per day, but never imports anything before the configured `PLAID_IMPORT_START_DATE`.
+- Uses a separate Amex history boundary and, when configured, imports only transactions whose Plaid `account_owner` matches the intended Amex cardholder.
 - Uses Plaid's stable transaction ID to upsert rows, so reruns do not create duplicates.
 - Replaces matched pending transactions with their posted versions and sends an **Expense posted** Telegram notice.
 - Excludes card payments and ordinary transfers to prevent double-counting.
@@ -54,6 +55,7 @@ In the repository, open **Settings → Secrets and variables → Actions** and c
 - `PLAID_ACCESS_TOKEN_CAPITAL_ONE`
 - `PLAID_ACCESS_TOKEN_AMEX`
 - `PLAID_ACCESS_TOKEN_VENMO` (only if Plaid supports the connection)
+- `AMEX_ALLOWED_ACCOUNT_OWNER` (the name Plaid reports for the Amex cardholder; store it as a secret rather than committing it)
 - `TELEGRAM_BOT_TOKEN`
 - `TELEGRAM_CHAT_ID`
 
@@ -63,11 +65,13 @@ Optional: add `CATEGORY_OVERRIDES_JSON` for merchant-specific corrections. Examp
 [{"match":"campus store","category":"School"}]
 ```
 
-The checked-in workflow sets `PLAID_IMPORT_START_DATE` to `2026-10-12`, so the first run cannot import older transactions. Change that date before the first run only if you intentionally want a different starting day.
+The checked-in workflow keeps `PLAID_IMPORT_START_DATE` at `2026-10-12` for Capital One and Venmo, and sets `AMEX_IMPORT_START_DATE` to `2026-10-05`. The earlier Amex boundary picks up charges after the existing October 4 Cushman Market and Taco Bell entries without duplicating those rows.
+
+Plaid does not always populate `account_owner` for credit-card transactions. When `AMEX_ALLOWED_ACCOUNT_OWNER` is set, this automation deliberately skips an Amex transaction with a missing or non-matching owner instead of risking importing another cardholder's charge. The run summary reports the number skipped.
 
 ### 5. Run once and verify
 
-Open **Actions → Daily expense sync → Run workflow**. The first run imports only transactions on or after October 12, 2026 and sends Telegram review prompts. After you reply, **Process transaction review replies** applies the amount on its next hourly run; it can also be run manually. For a category correction, use `amount | category`, such as `5 | Groceries`. Valid categories are Food, Shopping, School, Transport, Entertainment, Paraphernalia, Groceries, and Other.
+Open **Actions → Daily expense sync → Run workflow**. Capital One and Venmo import on or after October 12, 2026; Amex imports on or after October 5, 2026 and applies the configured cardholder filter. New expenses produce Telegram review prompts. After you reply, **Process transaction review replies** applies the amount on its next hourly run; it can also be run manually. For a category correction, use `amount | category`, such as `5 | Groceries`. Valid categories are Food, Shopping, School, Transport, Entertainment, Paraphernalia, Groceries, and Other.
 
 The daily schedule is 7:17 AM America/New_York. GitHub may delay scheduled jobs during periods of high load.
 

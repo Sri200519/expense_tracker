@@ -17,6 +17,7 @@ import {
 import { fetchTransactions } from "./lib/plaid.mjs"
 import { sendTransactionReview } from "./lib/telegram.mjs"
 import {
+  isAllowedAmexCardholder,
   isOnOrAfterImportDate,
   isVenmoFundingDuplicate,
   shouldIncludeTransaction,
@@ -89,17 +90,22 @@ async function main() {
   const pagesByTransactionId = new Map(existingPages.map((page) => [plaidTransactionId(page), page]))
   const items = configuredPlaidItems()
   const importStartDate = process.env.PLAID_IMPORT_START_DATE?.trim() || dateString(new Date())
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(importStartDate)) {
-    throw new Error("PLAID_IMPORT_START_DATE must use YYYY-MM-DD format")
+  const amexImportStartDate = process.env.AMEX_IMPORT_START_DATE?.trim() || importStartDate
+  if (![importStartDate, amexImportStartDate].every((value) => /^\d{4}-\d{2}-\d{2}$/.test(value))) {
+    throw new Error("PLAID_IMPORT_START_DATE and AMEX_IMPORT_START_DATE must use YYYY-MM-DD format")
   }
   const endDate = dateString(new Date())
   const rollingStartDate = dateString(new Date(Date.now() - 45 * DAY_MS))
-  const startDate = importStartDate > rollingStartDate ? importStartDate : rollingStartDate
+  const startDateFor = (itemLabel) => {
+    const configuredStart = itemLabel === "American Express" ? amexImportStartDate : importStartDate
+    return configuredStart > rollingStartDate ? configuredStart : rollingStartDate
+  }
 
-  const summary = { created: 0, updated: 0, archivedPending: 0, notified: 0, unchanged: 0 }
+  const summary = { created: 0, updated: 0, archivedPending: 0, notified: 0, unchanged: 0, skippedCardholder: 0 }
 
   const itemResults = []
   for (const item of items) {
+    const startDate = startDateFor(item.label)
     console.log(`Syncing ${item.label} from ${startDate} through ${endDate}`)
     const { accounts, transactions } = await fetchTransactions(item.accessToken, startDate, endDate)
     itemResults.push({ item, accounts, transactions })
@@ -115,9 +121,14 @@ async function main() {
 
   for (const { item, accounts, transactions } of itemResults) {
     const accountsById = accountMap(accounts)
+    const itemImportStartDate = item.label === "American Express" ? amexImportStartDate : importStartDate
 
     for (const transaction of transactions) {
-      if (!isOnOrAfterImportDate(transaction, importStartDate)) continue
+      if (!isOnOrAfterImportDate(transaction, itemImportStartDate)) continue
+      if (!isAllowedAmexCardholder(transaction, item.label, process.env.AMEX_ALLOWED_ACCOUNT_OWNER)) {
+        summary.skippedCardholder += 1
+        continue
+      }
       if (!shouldIncludeTransaction(transaction, item.label)) continue
       if (item.label !== "Venmo" && isVenmoFundingDuplicate(transaction, venmoTransactions)) continue
 

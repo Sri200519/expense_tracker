@@ -43,6 +43,7 @@ export async function fetchTransactions(accessToken, startDate, endDate) {
       options: {
         count,
         offset,
+        include_original_description: true,
       },
     })
 

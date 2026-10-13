@@ -1,6 +1,7 @@
 import test from "node:test"
 import assert from "node:assert/strict"
 import {
+  isAllowedAmexCardholder,
   isOnOrAfterImportDate,
   isVenmoFundingDuplicate,
   shouldIncludeTransaction,
@@ -70,6 +71,31 @@ test("keeps explicit Venmo refunds", () => {
 test("does not import transactions before the configured first-run date", () => {
   assert.equal(isOnOrAfterImportDate({ date: "2026-10-11" }, "2026-10-12"), false)
   assert.equal(isOnOrAfterImportDate({ date: "2026-10-12" }, "2026-10-12"), true)
+})
+
+test("imports only Amex transactions attributed to the configured cardholder", () => {
+  assert.equal(
+    isAllowedAmexCardholder(
+      { account_owner: "Example Person - Card 1007" },
+      "American Express",
+      "Example Person",
+    ),
+    true,
+  )
+  assert.equal(
+    isAllowedAmexCardholder(
+      { account_owner: "Another Cardholder - Card 2008" },
+      "American Express",
+      "Example Person",
+    ),
+    false,
+  )
+  assert.equal(isAllowedAmexCardholder({}, "American Express", "Example Person"), false)
+})
+
+test("does not apply the Amex cardholder filter to other Plaid items", () => {
+  assert.equal(isAllowedAmexCardholder({}, "Capital One", "Example Person"), true)
+  assert.equal(isAllowedAmexCardholder({}, "Venmo", "Example Person"), true)
 })
 
 test("removes a card-side Venmo funding duplicate", () => {

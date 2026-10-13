@@ -25,6 +25,25 @@ export function shouldIncludeTransaction(transaction, itemLabel) {
   return true
 }
 
+function normalizedOwner(value) {
+  return String(value || "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim()
+}
+
+export function isAllowedAmexCardholder(transaction, itemLabel, allowedOwner) {
+  if (itemLabel !== "American Express") return true
+  const expected = normalizedOwner(allowedOwner)
+  if (!expected) return true
+
+  const actual = normalizedOwner(transaction.account_owner)
+  if (!actual) return false
+
+  const expectedTokens = expected.split(/\s+/).filter(Boolean)
+  return expectedTokens.every((token) => actual.split(/\s+/).includes(token))
+}
+
 export function isOnOrAfterImportDate(transaction, importStartDate) {
   const effectiveDate = transaction.date || transaction.authorized_date
   return Boolean(effectiveDate && effectiveDate >= importStartDate)
