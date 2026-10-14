@@ -87,6 +87,10 @@ export async function GET() {
     return NextResponse.json({
       success: true,
       expenses,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, max-age=0"
+      }
     })
   } catch (error) {
     console.error("Error fetching expenses:", error)

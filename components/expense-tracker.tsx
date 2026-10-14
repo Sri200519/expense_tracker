@@ -170,7 +170,7 @@ export function ExpenseTracker() {
   useEffect(() => {
     const fetchExpenses = async () => {
       try {
-        const res = await fetch("/api/expenses")
+        const res = await fetch("/api/expenses", { cache: "no-store" })
         const data = await res.json()
         if (data.success && data.expenses) {
           const formatted = data.expenses
