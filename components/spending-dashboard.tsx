@@ -1,6 +1,24 @@
 "use client"
 
-import { Utensils, Car, ShoppingBag, Zap, MoreHorizontal, Coffee, Home } from "lucide-react"
+import { useState } from "react"
+import {
+  Banknote,
+  Book,
+  Car,
+  Coffee,
+  CreditCard,
+  Home,
+  MoreHorizontal,
+  Package,
+  ReceiptText,
+  RotateCcw,
+  ShoppingBag,
+  ShoppingCart,
+  Smartphone,
+  Tv,
+  Utensils,
+  Zap,
+} from "lucide-react"
 import { cn } from "@/lib/utils"
 
 interface Expense {
@@ -9,6 +27,7 @@ interface Expense {
   category: string
   merchant: string
   date: Date
+  paymentMethod?: string
 }
 
 const categoryConfig: Record<string, { icon: typeof Utensils; color: string; barColor: string }> = {
@@ -16,141 +35,210 @@ const categoryConfig: Record<string, { icon: typeof Utensils; color: string; bar
   Coffee: { icon: Coffee, color: "bg-amber-500/20 text-amber-400", barColor: "bg-amber-400" },
   Shopping: { icon: ShoppingBag, color: "bg-pink-500/20 text-pink-400", barColor: "bg-pink-400" },
   Transport: { icon: Car, color: "bg-blue-500/20 text-blue-400", barColor: "bg-blue-400" },
-  Home: { icon: Home, color: "bg-green-500/20 text-green-400", barColor: "bg-green-400" },
+  Home: { icon: Home, color: "bg-emerald-500/20 text-emerald-400", barColor: "bg-emerald-400" },
   Utilities: { icon: Zap, color: "bg-yellow-500/20 text-yellow-400", barColor: "bg-yellow-400" },
+  Bills: { icon: Zap, color: "bg-red-500/20 text-red-400", barColor: "bg-red-400" },
+  School: { icon: Book, color: "bg-sky-500/20 text-sky-400", barColor: "bg-sky-400" },
+  Entertainment: { icon: Tv, color: "bg-purple-500/20 text-purple-400", barColor: "bg-purple-400" },
+  Paraphernalia: { icon: Package, color: "bg-slate-500/20 text-slate-400", barColor: "bg-slate-400" },
+  Groceries: { icon: ShoppingCart, color: "bg-green-500/20 text-green-400", barColor: "bg-green-400" },
   Other: { icon: MoreHorizontal, color: "bg-gray-500/20 text-gray-400", barColor: "bg-gray-400" },
+}
+
+const paymentIcons: Record<string, typeof CreditCard> = {
+  Card: CreditCard,
+  "Capital One": CreditCard,
+  "American Express": CreditCard,
+  Cash: Banknote,
+  Venmo: Smartphone,
 }
 
 interface SpendingDashboardProps {
   expenses: Expense[]
 }
 
+const currency = new Intl.NumberFormat("en-US", {
+  style: "currency",
+  currency: "USD",
+})
+
 export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
+  const [visibleTransactionCount, setVisibleTransactionCount] = useState(20)
   const now = new Date()
-  
-  // Monthly total
-  const monthlyExpenses = expenses.filter(e => 
-    e.date.getMonth() === now.getMonth() && e.date.getFullYear() === now.getFullYear()
+  const validExpenses = expenses.filter((expense) => Number.isFinite(expense.amount) && expense.amount !== 0)
+  const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
+  const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
+
+  const monthlyExpenses = validExpenses.filter((expense) => expense.date >= monthStart && expense.date <= now)
+  const previousMonthExpenses = validExpenses.filter(
+    (expense) => expense.date >= previousMonthStart && expense.date < monthStart
   )
-  const monthlyTotal = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0)
-  
-  // Weekly breakdown (last 4 weeks)
-  const weeklyData = Array.from({ length: 4 }, (_, i) => {
+  const purchases = monthlyExpenses.filter((expense) => expense.amount > 0)
+  const refunds = monthlyExpenses.filter((expense) => expense.amount < 0)
+  const purchaseTotal = purchases.reduce((sum, expense) => sum + expense.amount, 0)
+  const refundTotal = Math.abs(refunds.reduce((sum, expense) => sum + expense.amount, 0))
+  const monthlyTotal = purchaseTotal - refundTotal
+  const previousMonthTotal = previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
+  const monthChange = previousMonthTotal === 0
+    ? null
+    : ((monthlyTotal - previousMonthTotal) / Math.abs(previousMonthTotal)) * 100
+  const averagePurchase = purchases.length ? purchaseTotal / purchases.length : 0
+
+  const weeklyData = Array.from({ length: 4 }, (_, index) => {
     const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - (i * 7) - now.getDay())
+    weekStart.setDate(now.getDate() - (index * 7) - now.getDay())
     weekStart.setHours(0, 0, 0, 0)
-    
     const weekEnd = new Date(weekStart)
     weekEnd.setDate(weekStart.getDate() + 7)
-    
-    const weekExpenses = expenses.filter(e => e.date >= weekStart && e.date < weekEnd)
-    const total = weekExpenses.reduce((sum, e) => sum + e.amount, 0)
-    
+    const total = validExpenses
+      .filter((expense) => expense.date >= weekStart && expense.date < weekEnd)
+      .reduce((sum, expense) => sum + expense.amount, 0)
+
     return {
-      label: i === 0 ? "This Week" : i === 1 ? "Last Week" : `${i} weeks ago`,
+      label: index === 0 ? "This Week" : index === 1 ? "Last Week" : `${index} weeks ago`,
       total,
     }
   }).reverse()
-  
-  const maxWeeklySpend = Math.max(...weeklyData.map(w => w.total), 1)
-  
-  // Category breakdown
-  const categoryTotals = monthlyExpenses.reduce((acc, e) => {
-    acc[e.category] = (acc[e.category] || 0) + e.amount
-    return acc
-  }, {} as Record<string, number>)
-  
-  const sortedCategories = Object.entries(categoryTotals)
-    .sort(([, a], [, b]) => b - a)
-  
-  const maxCategorySpend = Math.max(...sortedCategories.map(([, total]) => total), 1)
-  
-  // Recent 10 transactions
-  const recentTransactions = expenses.slice(0, 10)
-  
+  const maxWeeklySpend = Math.max(...weeklyData.map((week) => Math.max(Math.abs(week.total), 0)), 1)
+
+  const categoryTotals = monthlyExpenses.reduce((totals, expense) => {
+    const current = totals[expense.category] || { net: 0, purchases: 0, refunds: 0, count: 0 }
+    current.net += expense.amount
+    current.count += 1
+    if (expense.amount > 0) current.purchases += expense.amount
+    if (expense.amount < 0) current.refunds += Math.abs(expense.amount)
+    totals[expense.category] = current
+    return totals
+  }, {} as Record<string, { net: number; purchases: number; refunds: number; count: number }>)
+  const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b.net - a.net)
+  const maxCategorySpend = Math.max(...sortedCategories.map(([, totals]) => Math.max(totals.net, 0)), 1)
+
+  const paymentTotals = monthlyExpenses.reduce((totals, expense) => {
+    const method = expense.paymentMethod || "Card"
+    const current = totals[method] || { total: 0, count: 0 }
+    current.total += expense.amount
+    current.count += 1
+    totals[method] = current
+    return totals
+  }, {} as Record<string, { total: number; count: number }>)
+  const sortedPaymentMethods = Object.entries(paymentTotals).sort(([, a], [, b]) => b.total - a.total)
+
+  const recentTransactions = validExpenses.slice(0, visibleTransactionCount)
+
   const formatDate = (date: Date) => {
-    const diffDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
+    const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+    const transactionDay = new Date(date.getFullYear(), date.getMonth(), date.getDate())
+    const diffDays = Math.round((today.getTime() - transactionDay.getTime()) / 86_400_000)
     if (diffDays === 0) return "Today"
     if (diffDays === 1) return "Yesterday"
-    return date.toLocaleDateString("en-US", { month: "short", day: "numeric" })
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+    })
   }
-  
-  const getCategoryInfo = (categoryName: string) => {
-    return categoryConfig[categoryName] || categoryConfig.Other
-  }
+
+  const getCategoryInfo = (categoryName: string) => categoryConfig[categoryName] || categoryConfig.Other
 
   return (
     <div className="min-h-screen bg-background px-4 pb-8 pt-12 max-w-md mx-auto">
-      {/* Header */}
       <header className="mb-6">
         <h1 className="text-2xl font-semibold text-foreground">Analytics</h1>
-        <p className="text-sm text-muted-foreground">Your spending overview</p>
+        <p className="text-sm text-muted-foreground">Monthly, category, and card breakdowns</p>
       </header>
 
-      {/* Monthly Total Card */}
-      <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
+      <div className="bg-card rounded-2xl p-5 mb-4 border border-border">
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-          {now.toLocaleDateString("en-US", { month: "long" })} Total
+          {now.toLocaleDateString("en-US", { month: "long" })} net spending
         </p>
-        <div className="flex items-baseline gap-1">
-          <span className="text-4xl font-bold text-foreground">${monthlyTotal.toFixed(2)}</span>
+        <span className="text-4xl font-bold text-foreground">{currency.format(monthlyTotal)}</span>
+        <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
+          <span>{monthlyExpenses.length} transactions</span>
+          {monthChange !== null && (
+            <span className={cn("text-right", monthChange <= 0 ? "text-green-500" : "text-orange-400")}>
+              {Math.abs(monthChange).toFixed(0)}% {monthChange <= 0 ? "lower" : "higher"} than last month
+            </span>
+          )}
         </div>
-        <p className="text-sm text-muted-foreground mt-1">
-          {monthlyExpenses.length} transactions
-        </p>
       </div>
 
-      {/* Weekly Breakdown */}
+      <div className="grid grid-cols-3 gap-2 mb-5">
+        <div className="bg-card rounded-xl p-3 border border-border">
+          <ReceiptText className="w-4 h-4 text-primary mb-2" />
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Purchases</p>
+          <p className="text-sm font-semibold text-foreground mt-1">{currency.format(purchaseTotal)}</p>
+          <p className="text-[10px] text-muted-foreground">{purchases.length} charges</p>
+        </div>
+        <div className="bg-card rounded-xl p-3 border border-border">
+          <RotateCcw className="w-4 h-4 text-green-500 mb-2" />
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Refunds</p>
+          <p className="text-sm font-semibold text-green-500 mt-1">{currency.format(refundTotal)}</p>
+          <p className="text-[10px] text-muted-foreground">{refunds.length} refunds</p>
+        </div>
+        <div className="bg-card rounded-xl p-3 border border-border">
+          <MoreHorizontal className="w-4 h-4 text-muted-foreground mb-2" />
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Average</p>
+          <p className="text-sm font-semibold text-foreground mt-1">{currency.format(averagePurchase)}</p>
+          <p className="text-[10px] text-muted-foreground">per charge</p>
+        </div>
+      </div>
+
       <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
-        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Weekly Spend</h2>
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Weekly net spend</h2>
         <div className="space-y-3">
-          {weeklyData.map((week, i) => (
-            <div key={i} className="flex items-center gap-3">
+          {weeklyData.map((week) => (
+            <div key={week.label} className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground w-20 shrink-0">{week.label}</span>
               <div className="flex-1 h-6 bg-secondary rounded-lg overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-lg transition-all duration-500"
-                  style={{ width: `${(week.total / maxWeeklySpend) * 100}%` }}
+                  className={cn("h-full rounded-lg transition-all duration-500", week.total < 0 ? "bg-green-500" : "bg-primary")}
+                  style={{ width: `${(Math.abs(week.total) / maxWeeklySpend) * 100}%` }}
                 />
               </div>
-              <span className="text-sm font-medium text-foreground w-16 text-right">
-                ${week.total.toFixed(0)}
+              <span className={cn("text-sm font-medium w-20 text-right", week.total < 0 ? "text-green-500" : "text-foreground")}>
+                {currency.format(week.total)}
               </span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Category Breakdown */}
       <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
-        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">By Category</h2>
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">By category</h2>
         {sortedCategories.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No expenses this month</p>
         ) : (
           <div className="space-y-4">
-            {sortedCategories.map(([category, total]) => {
+            {sortedCategories.map(([category, totals]) => {
               const catInfo = getCategoryInfo(category)
               const Icon = catInfo.icon
-              const percentage = ((total / monthlyTotal) * 100).toFixed(0)
-              
+              const percentage = purchaseTotal > 0 ? (totals.purchases / purchaseTotal) * 100 : 0
+
               return (
                 <div key={category}>
                   <div className="flex items-center justify-between mb-2">
-                    <div className="flex items-center gap-2">
-                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", catInfo.color)}>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", catInfo.color)}>
                         <Icon className="w-4 h-4" />
                       </div>
-                      <span className="text-sm font-medium text-foreground">{category}</span>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium text-foreground truncate">{category}</p>
+                        <p className="text-[10px] text-muted-foreground">
+                          {totals.count} transactions · {percentage.toFixed(0)}% of purchases
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{percentage}%</span>
-                      <span className="text-sm font-semibold text-foreground">${total.toFixed(2)}</span>
+                    <div className="text-right shrink-0 ml-2">
+                      <p className={cn("text-sm font-semibold", totals.net < 0 ? "text-green-500" : "text-foreground")}>
+                        {currency.format(totals.net)}
+                      </p>
+                      {totals.refunds > 0 && <p className="text-[10px] text-green-500">{currency.format(totals.refunds)} refunded</p>}
                     </div>
                   </div>
                   <div className="h-2 bg-secondary rounded-full overflow-hidden">
                     <div
                       className={cn("h-full rounded-full transition-all duration-500", catInfo.barColor)}
-                      style={{ width: `${(total / maxCategorySpend) * 100}%` }}
+                      style={{ width: `${Math.max(0, totals.net / maxCategorySpend) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -160,9 +248,38 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
         )}
       </div>
 
-      {/* Recent Transactions */}
+      <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">By payment method</h2>
+        {sortedPaymentMethods.length === 0 ? (
+          <p className="text-sm text-muted-foreground text-center py-4">No expenses this month</p>
+        ) : (
+          <div className="space-y-3">
+            {sortedPaymentMethods.map(([method, totals]) => {
+              const Icon = paymentIcons[method] || CreditCard
+              return (
+                <div key={method} className="flex items-center gap-3 rounded-xl bg-secondary/50 p-3">
+                  <div className="w-9 h-9 rounded-full bg-primary/15 text-primary flex items-center justify-center shrink-0">
+                    <Icon className="w-4 h-4" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-foreground truncate">{method}</p>
+                    <p className="text-xs text-muted-foreground">{totals.count} transactions</p>
+                  </div>
+                  <p className={cn("text-sm font-semibold", totals.total < 0 ? "text-green-500" : "text-foreground")}>
+                    {currency.format(totals.total)}
+                  </p>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+
       <div className="bg-card rounded-2xl p-5 border border-border">
-        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Recent Transactions</h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs uppercase tracking-wide text-muted-foreground">All transactions</h2>
+          <span className="text-xs text-muted-foreground">{validExpenses.length} total</span>
+        </div>
         {recentTransactions.length === 0 ? (
           <p className="text-sm text-muted-foreground text-center py-4">No transactions yet</p>
         ) : (
@@ -170,7 +287,7 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
             {recentTransactions.map((expense) => {
               const catInfo = getCategoryInfo(expense.category)
               const Icon = catInfo.icon
-              
+
               return (
                 <div key={expense.id} className="flex items-center gap-3">
                   <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0", catInfo.color)}>
@@ -178,14 +295,24 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-medium text-foreground truncate">{expense.merchant}</p>
-                    <p className="text-xs text-muted-foreground">{formatDate(expense.date)}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {expense.category} · {expense.paymentMethod || "Card"} · {formatDate(expense.date)}
+                    </p>
                   </div>
-                  <span className="text-sm font-semibold text-foreground">
-                    -${expense.amount.toFixed(2)}
+                  <span className={cn("text-sm font-semibold", expense.amount < 0 ? "text-green-500" : "text-foreground")}>
+                    {expense.amount < 0 ? "+" : "-"}${Math.abs(expense.amount).toFixed(2)}
                   </span>
                 </div>
               )
             })}
+            {visibleTransactionCount < validExpenses.length && (
+              <button
+                onClick={() => setVisibleTransactionCount((count) => count + 20)}
+                className="w-full rounded-xl bg-secondary py-3 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+              >
+                Show 20 more ({validExpenses.length - visibleTransactionCount} remaining)
+              </button>
+            )}
           </div>
         )}
       </div>

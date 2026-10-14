@@ -165,6 +165,7 @@ export function ExpenseTracker() {
   const [activeTab, setActiveTab] = useState<"expenses" | "analytics">("expenses")
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses)
   const [isLoadingExpenses, setIsLoadingExpenses] = useState(true)
+  const [visibleExpenseCount, setVisibleExpenseCount] = useState(10)
 
   useEffect(() => {
     const fetchExpenses = async () => {
@@ -172,10 +173,12 @@ export function ExpenseTracker() {
         const res = await fetch("/api/expenses")
         const data = await res.json()
         if (data.success && data.expenses) {
-          const formatted = data.expenses.map((e: any) => ({
-            ...e,
-            date: new Date(e.date)
-          }))
+          const formatted = data.expenses
+            .map((e: any) => ({
+              ...e,
+              date: new Date(e.date)
+            }))
+            .filter((e: Expense) => Number.isFinite(e.amount) && e.amount !== 0)
           setExpenses(formatted)
         }
       } catch (error) {
@@ -774,7 +777,7 @@ export function ExpenseTracker() {
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {expenses.slice(0, 5).map((expense) => {
+                  {expenses.slice(0, visibleExpenseCount).map((expense) => {
                     const catInfo = getCategoryInfo(expense.category)
                     const Icon = catInfo.icon
 
@@ -788,10 +791,14 @@ export function ExpenseTracker() {
                         </div>
                         <div className="flex-1 min-w-0">
                           <p className="font-medium text-foreground truncate">{expense.merchant}</p>
-                          <p className="text-sm text-muted-foreground">{formatDate(expense.date)}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {expense.category} · {expense.paymentMethod || "Card"} · {formatDate(expense.date)}
+                          </p>
                         </div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-foreground">-${expense.amount.toFixed(2)}</span>
+                          <span className={cn("font-semibold", expense.amount < 0 ? "text-green-500" : "text-foreground")}>
+                            {expense.amount < 0 ? "+" : "-"}${Math.abs(expense.amount).toFixed(2)}
+                          </span>
                           <button
                             onClick={() => handleDeleteExpense(expense.id)}
                             className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-destructive/20 rounded-lg transition-all"
@@ -803,6 +810,14 @@ export function ExpenseTracker() {
                       </div>
                     )
                   })}
+                  {visibleExpenseCount < expenses.length && (
+                    <button
+                      onClick={() => setVisibleExpenseCount((count) => count + 20)}
+                      className="w-full rounded-xl bg-secondary py-3 text-sm font-medium text-secondary-foreground transition-colors hover:bg-secondary/80"
+                    >
+                      Show more transactions ({expenses.length - visibleExpenseCount} remaining)
+                    </button>
+                  )}
                 </div>
               )}
             </div>
