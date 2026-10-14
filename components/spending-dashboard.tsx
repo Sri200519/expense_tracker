@@ -84,22 +84,20 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
     : ((monthlyTotal - previousMonthTotal) / Math.abs(previousMonthTotal)) * 100
   const averagePurchase = purchases.length ? purchaseTotal / purchases.length : 0
 
-  const weeklyData = Array.from({ length: 4 }, (_, index) => {
-    const weekStart = new Date(now)
-    weekStart.setDate(now.getDate() - (index * 7) - now.getDay())
-    weekStart.setHours(0, 0, 0, 0)
-    const weekEnd = new Date(weekStart)
-    weekEnd.setDate(weekStart.getDate() + 7)
+  const monthlyData = Array.from({ length: 6 }, (_, index) => {
+    const monthsAgo = 5 - index
+    const periodStart = new Date(now.getFullYear(), now.getMonth() - monthsAgo, 1)
+    const periodEnd = new Date(now.getFullYear(), now.getMonth() - monthsAgo + 1, 1)
     const total = validExpenses
-      .filter((expense) => expense.date >= weekStart && expense.date < weekEnd)
+      .filter((expense) => expense.date >= periodStart && expense.date < periodEnd)
       .reduce((sum, expense) => sum + expense.amount, 0)
 
     return {
-      label: index === 0 ? "This Week" : index === 1 ? "Last Week" : `${index} weeks ago`,
+      label: periodStart.toLocaleDateString("en-US", { month: "short" }),
       total,
     }
-  }).reverse()
-  const maxWeeklySpend = Math.max(...weeklyData.map((week) => Math.max(Math.abs(week.total), 0)), 1)
+  })
+  const maxMonthlySpend = Math.max(...monthlyData.map((month) => Math.max(Math.abs(month.total), 0)), 1)
 
   const categoryTotals = monthlyExpenses.reduce((totals, expense) => {
     const current = totals[expense.category] || { net: 0, purchases: 0, refunds: 0, count: 0 }
@@ -184,19 +182,19 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
       </div>
 
       <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
-        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Weekly net spend</h2>
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Monthly net spend</h2>
         <div className="space-y-3">
-          {weeklyData.map((week) => (
-            <div key={week.label} className="flex items-center gap-3">
-              <span className="text-xs text-muted-foreground w-20 shrink-0">{week.label}</span>
+          {monthlyData.map((month) => (
+            <div key={month.label} className="flex items-center gap-3">
+              <span className="text-xs text-muted-foreground w-20 shrink-0">{month.label}</span>
               <div className="flex-1 h-6 bg-secondary rounded-lg overflow-hidden">
                 <div
-                  className={cn("h-full rounded-lg transition-all duration-500", week.total < 0 ? "bg-green-500" : "bg-primary")}
-                  style={{ width: `${(Math.abs(week.total) / maxWeeklySpend) * 100}%` }}
+                  className={cn("h-full rounded-lg transition-all duration-500", month.total < 0 ? "bg-green-500" : "bg-primary")}
+                  style={{ width: `${(Math.abs(month.total) / maxMonthlySpend) * 100}%` }}
                 />
               </div>
-              <span className={cn("text-sm font-medium w-20 text-right", week.total < 0 ? "text-green-500" : "text-foreground")}>
-                {currency.format(week.total)}
+              <span className={cn("text-sm font-medium w-20 text-right", month.total < 0 ? "text-green-500" : "text-foreground")}>
+                {currency.format(month.total)}
               </span>
             </div>
           ))}
