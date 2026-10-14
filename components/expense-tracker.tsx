@@ -178,7 +178,7 @@ export function ExpenseTracker() {
               ...e,
               date: new Date(e.date)
             }))
-            .filter((e: Expense) => Number.isFinite(e.amount) && e.amount !== 0)
+            .filter((e: Expense) => Number.isFinite(e.amount) && e.amount > 0)
           setExpenses(formatted)
         }
       } catch (error) {

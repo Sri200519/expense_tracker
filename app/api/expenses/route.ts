@@ -44,7 +44,7 @@ export async function GET() {
               },
               {
                 property: "Total Amount",
-                number: { does_not_equal: 0 }
+                number: { greater_than: 0 }
               }
             ]
           },

@@ -11,7 +11,7 @@ The recurring jobs run in GitHub Actions. Your computer does not need to stay on
 - Uses Plaid's stable transaction ID to upsert rows, so reruns do not create duplicates.
 - Replaces matched pending transactions with their posted versions and sends an **Expense posted** Telegram notice.
 - Excludes card payments and ordinary transfers to prevent double-counting.
-- Includes merchant refunds as negative amounts. For Venmo, it includes outgoing personal payments and refunds while excluding incoming payments and transfers.
+- Uses your Telegram reply as the final net amount. Refunds, credits, incoming Venmo payments, and transfers are not imported as separate expenses.
 - Deduplicates a matching `VENMO` charge on Capital One or American Express when the same payment is present in the connected Venmo feed.
 - Keeps the original bank amount internally for matching and `all`, but hides it from the default Notion view. `Total Amount` stays blank until your Telegram reply and then stores exactly what you replied.
 - Stores American Express and Capital One under the `Card` payment method while retaining the issuer in `Plaid Item`; Venmo remains `Venmo`.

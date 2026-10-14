@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   Package,
   ReceiptText,
-  RotateCcw,
   ShoppingBag,
   ShoppingCart,
   Smartphone,
@@ -65,7 +64,7 @@ const currency = new Intl.NumberFormat("en-US", {
 export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
   const [visibleTransactionCount, setVisibleTransactionCount] = useState(20)
   const now = new Date()
-  const validExpenses = expenses.filter((expense) => Number.isFinite(expense.amount) && expense.amount !== 0)
+  const validExpenses = expenses.filter((expense) => Number.isFinite(expense.amount) && expense.amount > 0)
   const monthStart = new Date(now.getFullYear(), now.getMonth(), 1)
   const previousMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1)
 
@@ -73,16 +72,12 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
   const previousMonthExpenses = validExpenses.filter(
     (expense) => expense.date >= previousMonthStart && expense.date < monthStart
   )
-  const purchases = monthlyExpenses.filter((expense) => expense.amount > 0)
-  const refunds = monthlyExpenses.filter((expense) => expense.amount < 0)
-  const purchaseTotal = purchases.reduce((sum, expense) => sum + expense.amount, 0)
-  const refundTotal = Math.abs(refunds.reduce((sum, expense) => sum + expense.amount, 0))
-  const monthlyTotal = purchaseTotal - refundTotal
+  const monthlyTotal = monthlyExpenses.reduce((sum, expense) => sum + expense.amount, 0)
   const previousMonthTotal = previousMonthExpenses.reduce((sum, expense) => sum + expense.amount, 0)
   const monthChange = previousMonthTotal === 0
     ? null
     : ((monthlyTotal - previousMonthTotal) / Math.abs(previousMonthTotal)) * 100
-  const averagePurchase = purchases.length ? purchaseTotal / purchases.length : 0
+  const averagePurchase = monthlyExpenses.length ? monthlyTotal / monthlyExpenses.length : 0
 
   const monthlyData = Array.from({ length: 6 }, (_, index) => {
     const monthsAgo = 5 - index
@@ -100,16 +95,14 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
   const maxMonthlySpend = Math.max(...monthlyData.map((month) => Math.max(Math.abs(month.total), 0)), 1)
 
   const categoryTotals = monthlyExpenses.reduce((totals, expense) => {
-    const current = totals[expense.category] || { net: 0, purchases: 0, refunds: 0, count: 0 }
-    current.net += expense.amount
+    const current = totals[expense.category] || { total: 0, count: 0 }
+    current.total += expense.amount
     current.count += 1
-    if (expense.amount > 0) current.purchases += expense.amount
-    if (expense.amount < 0) current.refunds += Math.abs(expense.amount)
     totals[expense.category] = current
     return totals
-  }, {} as Record<string, { net: number; purchases: number; refunds: number; count: number }>)
-  const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b.net - a.net)
-  const maxCategorySpend = Math.max(...sortedCategories.map(([, totals]) => Math.max(totals.net, 0)), 1)
+  }, {} as Record<string, { total: number; count: number }>)
+  const sortedCategories = Object.entries(categoryTotals).sort(([, a], [, b]) => b.total - a.total)
+  const maxCategorySpend = Math.max(...sortedCategories.map(([, totals]) => totals.total), 1)
 
   const paymentTotals = monthlyExpenses.reduce((totals, expense) => {
     const method = expense.paymentMethod || "Card"
@@ -147,7 +140,7 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
 
       <div className="bg-card rounded-2xl p-5 mb-4 border border-border">
         <p className="text-xs uppercase tracking-wide text-muted-foreground mb-1">
-          {now.toLocaleDateString("en-US", { month: "long" })} net spending
+          {now.toLocaleDateString("en-US", { month: "long" })} spending
         </p>
         <span className="text-4xl font-bold text-foreground">{currency.format(monthlyTotal)}</span>
         <div className="mt-2 flex items-center justify-between gap-3 text-sm text-muted-foreground">
@@ -160,18 +153,12 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
         </div>
       </div>
 
-      <div className="grid grid-cols-3 gap-2 mb-5">
+      <div className="grid grid-cols-2 gap-2 mb-5">
         <div className="bg-card rounded-xl p-3 border border-border">
           <ReceiptText className="w-4 h-4 text-primary mb-2" />
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Purchases</p>
-          <p className="text-sm font-semibold text-foreground mt-1">{currency.format(purchaseTotal)}</p>
-          <p className="text-[10px] text-muted-foreground">{purchases.length} charges</p>
-        </div>
-        <div className="bg-card rounded-xl p-3 border border-border">
-          <RotateCcw className="w-4 h-4 text-green-500 mb-2" />
-          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Refunds</p>
-          <p className="text-sm font-semibold text-green-500 mt-1">{currency.format(refundTotal)}</p>
-          <p className="text-[10px] text-muted-foreground">{refunds.length} refunds</p>
+          <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Total</p>
+          <p className="text-sm font-semibold text-foreground mt-1">{currency.format(monthlyTotal)}</p>
+          <p className="text-[10px] text-muted-foreground">{monthlyExpenses.length} charges</p>
         </div>
         <div className="bg-card rounded-xl p-3 border border-border">
           <MoreHorizontal className="w-4 h-4 text-muted-foreground mb-2" />
@@ -182,18 +169,18 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
       </div>
 
       <div className="bg-card rounded-2xl p-5 mb-5 border border-border">
-        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Monthly net spend</h2>
+        <h2 className="text-xs uppercase tracking-wide text-muted-foreground mb-4">Monthly spending</h2>
         <div className="space-y-3">
           {monthlyData.map((month) => (
             <div key={month.label} className="flex items-center gap-3">
               <span className="text-xs text-muted-foreground w-20 shrink-0">{month.label}</span>
               <div className="flex-1 h-6 bg-secondary rounded-lg overflow-hidden">
                 <div
-                  className={cn("h-full rounded-lg transition-all duration-500", month.total < 0 ? "bg-green-500" : "bg-primary")}
+                  className="h-full rounded-lg bg-primary transition-all duration-500"
                   style={{ width: `${(Math.abs(month.total) / maxMonthlySpend) * 100}%` }}
                 />
               </div>
-              <span className={cn("text-sm font-medium w-20 text-right", month.total < 0 ? "text-green-500" : "text-foreground")}>
+              <span className="text-sm font-medium w-20 text-right text-foreground">
                 {currency.format(month.total)}
               </span>
             </div>
@@ -210,7 +197,7 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
             {sortedCategories.map(([category, totals]) => {
               const catInfo = getCategoryInfo(category)
               const Icon = catInfo.icon
-              const percentage = purchaseTotal > 0 ? (totals.purchases / purchaseTotal) * 100 : 0
+              const percentage = monthlyTotal > 0 ? (totals.total / monthlyTotal) * 100 : 0
 
               return (
                 <div key={category}>
@@ -222,21 +209,20 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
                       <div className="min-w-0">
                         <p className="text-sm font-medium text-foreground truncate">{category}</p>
                         <p className="text-[10px] text-muted-foreground">
-                          {totals.count} transactions · {percentage.toFixed(0)}% of purchases
+                          {totals.count} transactions · {percentage.toFixed(0)}% of total
                         </p>
                       </div>
                     </div>
                     <div className="text-right shrink-0 ml-2">
-                      <p className={cn("text-sm font-semibold", totals.net < 0 ? "text-green-500" : "text-foreground")}>
-                        {currency.format(totals.net)}
+                      <p className="text-sm font-semibold text-foreground">
+                        {currency.format(totals.total)}
                       </p>
-                      {totals.refunds > 0 && <p className="text-[10px] text-green-500">{currency.format(totals.refunds)} refunded</p>}
                     </div>
                   </div>
                   <div className="h-2 bg-secondary rounded-full overflow-hidden">
                     <div
                       className={cn("h-full rounded-full transition-all duration-500", catInfo.barColor)}
-                      style={{ width: `${Math.max(0, totals.net / maxCategorySpend) * 100}%` }}
+                      style={{ width: `${(totals.total / maxCategorySpend) * 100}%` }}
                     />
                   </div>
                 </div>
@@ -263,7 +249,7 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
                     <p className="text-sm font-medium text-foreground truncate">{method}</p>
                     <p className="text-xs text-muted-foreground">{totals.count} transactions</p>
                   </div>
-                  <p className={cn("text-sm font-semibold", totals.total < 0 ? "text-green-500" : "text-foreground")}>
+                  <p className="text-sm font-semibold text-foreground">
                     {currency.format(totals.total)}
                   </p>
                 </div>
@@ -297,8 +283,8 @@ export function SpendingDashboard({ expenses }: SpendingDashboardProps) {
                       {expense.category} · {expense.paymentMethod || "Card"} · {formatDate(expense.date)}
                     </p>
                   </div>
-                  <span className={cn("text-sm font-semibold", expense.amount < 0 ? "text-green-500" : "text-foreground")}>
-                    {expense.amount < 0 ? "+" : "-"}${Math.abs(expense.amount).toFixed(2)}
+                  <span className="text-sm font-semibold text-foreground">
+                    -${expense.amount.toFixed(2)}
                   </span>
                 </div>
               )

@@ -22,7 +22,7 @@ const sleep = (milliseconds) => new Promise((resolve) => setTimeout(resolve, mil
 
 export function parseAmount(text) {
   const normalized = String(text || "").trim().replace(/[$,]/g, "")
-  if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalized)) return null
+  if (!/^\d+(?:\.\d{1,2})?$/.test(normalized)) return null
   const amount = Number(normalized)
   return Number.isFinite(amount) ? amount : null
 }
@@ -106,7 +106,7 @@ async function main() {
     const statementAmount = pageNumber(page.properties?.["Statement Amount"]) ?? 0
     const amount = parsed.useFullAmount ? statementAmount : parsed.amount
 
-    if (amount === 0) {
+    if (amount <= 0) {
       if (pageCheckbox(page.properties?.Excluded)) {
         await sendTelegramConfirmation("This transaction is already excluded from your expense sheet.", message.message_id)
         continue
@@ -116,7 +116,7 @@ async function main() {
       await excludeExpense(page.id, notes)
       await sleep(WRITE_DELAY_MS)
       await sendTelegramConfirmation(
-        `Removed ${merchant} from your visible expense sheet. It will not be re-imported.`,
+        `Removed ${merchant} from your visible expense sheet. Credits and refunds are not imported separately.`,
         message.message_id,
       )
       processed += 1

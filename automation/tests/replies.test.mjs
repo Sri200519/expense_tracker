@@ -11,6 +11,7 @@ test("parses common amount replies", () => {
 test("rejects ambiguous reply text", () => {
   assert.equal(parseAmount("mine is 12.50"), null)
   assert.equal(parseAmount("12.345"), null)
+  assert.equal(parseAmount("-12.50"), null)
 })
 
 test("parses amount plus a Notion category", () => {

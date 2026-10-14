@@ -24,7 +24,7 @@ test("excludes ordinary credit card payments", () => {
   )
 })
 
-test("keeps merchant refunds as negative spending", () => {
+test("excludes merchant refunds because the user supplies the net amount", () => {
   assert.equal(
     shouldIncludeTransaction(
       {
@@ -37,7 +37,7 @@ test("keeps merchant refunds as negative spending", () => {
       },
       "Capital One",
     ),
-    true,
+    false,
   )
 })
 
@@ -58,13 +58,13 @@ test("keeps outgoing Venmo payments and removes incoming payments", () => {
   )
 })
 
-test("keeps explicit Venmo refunds", () => {
+test("excludes explicit Venmo refunds", () => {
   assert.equal(
     shouldIncludeTransaction(
       { amount: -12, name: "Venmo refund", personal_finance_category: { primary: "TRANSFER_IN" } },
       "Venmo",
     ),
-    true,
+    false,
   )
 })
 
